@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, CheckCircle } from "lucide-react";
 import api from "@/lib/api";
-import type { Address } from "@/types";
+import type { Address, CartResponse } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card, CardContent, CardHeader, CardTitle, Separator } from "@/components/ui/index";
 import { formatPrice } from "@/lib/utils";
@@ -16,57 +16,51 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { cart, fetchCart } = useCartStore();
+  const [mounted, setMounted] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [note, setNote] = useState("");
   const [placing, setPlacing] = useState(false);
   const [useNewAddress, setUseNewAddress] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [newAddress, setNewAddress] = useState({
-    full_name: user?.full_name ?? "",
-    phone: user?.phone ?? "",
-    province: "", district: "", ward: "", street: "", is_default: false,
+    full_name: "", phone: "", province: "", district: "", ward: "", street: "", is_default: false,
   });
+
+  useEffect(() => {
+    setMounted(true);
+    if (user) {
+      setNewAddress(a => ({ ...a, full_name: user.full_name, phone: user.phone ?? "" }));
+    }
+  }, [user]);
 
   const { data: addresses } = useQuery<Address[]>({
     queryKey: ["addresses"],
     queryFn: async () => (await api.get("/users/me/addresses")).data,
-    enabled: !!user,
+    enabled: mounted && !!user,
+    onSuccess: (data) => {
+      const def = data.find((a) => a.is_default) ?? data[0];
+      if (def) setSelectedAddressId(def.id);
+      if (!data.length) setUseNewAddress(true);
+    },
   });
-
-  // Thay onSuccess bằng useEffect
-  useEffect(() => {
-    if (!addresses) return;
-    const def = addresses.find((a) => a.is_default) ?? addresses[0];
-    if (def) setSelectedAddressId(def.id);
-    if (!addresses.length) setUseNewAddress(true);
-  }, [addresses]);
 
   const shippingFee = (cart?.subtotal ?? 0) >= 500000 ? 0 : 30000;
   const total = (cart?.subtotal ?? 0) + shippingFee;
 
   const handlePlaceOrder = async () => {
     let addressId = selectedAddressId;
-
     if (useNewAddress || !addressId) {
       if (!newAddress.phone || !newAddress.province || !newAddress.street) {
-        toast.error("Vui lòng điền đầy đủ địa chỉ");
-        return;
+        toast.error("Vui lòng điền đầy đủ địa chỉ"); return;
       }
       const { data } = await api.post("/users/me/addresses", {
-        ...newAddress,
-        ward: newAddress.ward || "N/A",
-        district: newAddress.district || "N/A",
+        ...newAddress, ward: newAddress.ward || "N/A", district: newAddress.district || "N/A"
       });
       addressId = data.id;
     }
-
     setPlacing(true);
     try {
-      await api.post("/orders", {
-        address_id: addressId,
-        payment_method: paymentMethod,
-        note: note || undefined,
-      });
+      await api.post("/orders", { address_id: addressId, payment_method: paymentMethod, note: note || undefined });
       await fetchCart();
       toast.success("Đặt hàng thành công!");
       router.push("/orders");
@@ -77,6 +71,9 @@ export default function CheckoutPage() {
     }
   };
 
+  // Không render gì khi SSR
+  if (!mounted) return null;
+
   if (!user) { router.push("/login"); return null; }
 
   return (
@@ -84,7 +81,6 @@ export default function CheckoutPage() {
       <h1 className="text-2xl font-bold mb-6">Thanh toán</h1>
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-5">
-          {/* Shipping address */}
           <Card>
             <CardHeader><CardTitle className="text-base">Địa chỉ giao hàng</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -117,7 +113,6 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
 
-          {/* Payment method */}
           <Card>
             <CardHeader><CardTitle className="text-base">Phương thức thanh toán</CardTitle></CardHeader>
             <CardContent className="space-y-2">
@@ -133,21 +128,15 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
 
-          {/* Note */}
           <Card>
             <CardHeader><CardTitle className="text-base">Ghi chú đơn hàng</CardTitle></CardHeader>
             <CardContent>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Ghi chú cho người bán (tuỳ chọn)..."
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-              />
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú cho người bán (tuỳ chọn)..."
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
             </CardContent>
           </Card>
         </div>
 
-        {/* Summary */}
         <div className="rounded-xl border p-5 bg-card h-fit space-y-4 sticky top-20">
           <h2 className="font-bold">Tóm tắt đơn hàng</h2>
           <div className="space-y-2 text-sm max-h-40 overflow-y-auto">
@@ -160,12 +149,8 @@ export default function CheckoutPage() {
           </div>
           <Separator />
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tạm tính</span>
-              <span>{formatPrice(cart?.subtotal ?? 0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Phí ship</span>
+            <div className="flex justify-between"><span className="text-muted-foreground">Tạm tính</span><span>{formatPrice(cart?.subtotal ?? 0)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Phí ship</span>
               <span>{shippingFee === 0 ? <span className="text-green-600">Miễn phí</span> : formatPrice(shippingFee)}</span>
             </div>
           </div>
