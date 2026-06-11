@@ -2,12 +2,23 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 
+# Render inject DATABASE_URL dạng postgresql:// hoặc postgres://
+# Cần đổi sang postgresql+asyncpg:// cho async driver
+def fix_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+database_url = fix_database_url(settings.database_url)
+
 engine = create_async_engine(
-    settings.database_url,
+    database_url,
     echo=not settings.is_production,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=5,
+    max_overflow=10,
 )
 
 AsyncSessionLocal = async_sessionmaker(
