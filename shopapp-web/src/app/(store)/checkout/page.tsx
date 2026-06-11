@@ -37,12 +37,16 @@ export default function CheckoutPage() {
     queryKey: ["addresses"],
     queryFn: async () => (await api.get("/users/me/addresses")).data,
     enabled: mounted && !!user,
-    onSuccess: (data) => {
-      const def = data.find((a) => a.is_default) ?? data[0];
-      if (def) setSelectedAddressId(def.id);
-      if (!data.length) setUseNewAddress(true);
-    },
   });
+
+  // Xử lý khi addresses load xong
+  useEffect(() => {
+    if (addresses) {
+      const def = addresses.find((a) => a.is_default) ?? addresses[0];
+      if (def) setSelectedAddressId(def.id);
+      if (!addresses.length) setUseNewAddress(true);
+    }
+  }, [addresses]);
 
   const shippingFee = (cart?.subtotal ?? 0) >= 500000 ? 0 : 30000;
   const total = (cart?.subtotal ?? 0) + shippingFee;
@@ -99,12 +103,12 @@ export default function CheckoutPage() {
                 </>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label>Họ tên</Label><Input value={newAddress.full_name} onChange={(e) => setNewAddress({...newAddress, full_name: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Số điện thoại</Label><Input value={newAddress.phone} onChange={(e) => setNewAddress({...newAddress, phone: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Tỉnh/Thành phố</Label><Input value={newAddress.province} onChange={(e) => setNewAddress({...newAddress, province: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Quận/Huyện</Label><Input value={newAddress.district} onChange={(e) => setNewAddress({...newAddress, district: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Phường/Xã</Label><Input value={newAddress.ward} onChange={(e) => setNewAddress({...newAddress, ward: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Số nhà, tên đường</Label><Input value={newAddress.street} onChange={(e) => setNewAddress({...newAddress, street: e.target.value})} /></div>
+                  <div className="space-y-1"><Label>Họ tên</Label><Input value={newAddress.full_name} onChange={(e) => setNewAddress({ ...newAddress, full_name: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Số điện thoại</Label><Input value={newAddress.phone} onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Tỉnh/Thành phố</Label><Input value={newAddress.province} onChange={(e) => setNewAddress({ ...newAddress, province: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Quận/Huyện</Label><Input value={newAddress.district} onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Phường/Xã</Label><Input value={newAddress.ward} onChange={(e) => setNewAddress({ ...newAddress, ward: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Số nhà, tên đường</Label><Input value={newAddress.street} onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })} /></div>
                   {addresses && addresses.length > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setUseNewAddress(false)} className="col-span-2">← Dùng địa chỉ đã lưu</Button>
                   )}
