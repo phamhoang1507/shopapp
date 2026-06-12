@@ -5,7 +5,6 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Gắn access token vào mọi request
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("access_token");
@@ -14,7 +13,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto refresh token khi 401
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
@@ -22,6 +20,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
+        if (typeof window === "undefined") throw new Error("SSR");
         const refresh = localStorage.getItem("refresh_token");
         if (!refresh) throw new Error("no refresh token");
         const { data } = await axios.post(
@@ -33,9 +32,11 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${data.access_token}`;
         return api(original);
       } catch {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        window.location.href = "/login";
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);
