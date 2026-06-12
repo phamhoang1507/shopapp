@@ -40,6 +40,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.11",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
